@@ -1,6 +1,5 @@
 mod db;
 mod xdr;
-mod sequence_manager;
 
 use axum::{extract::State, routing::get, Json, Router};
 use serde::Serialize;
