@@ -43,3 +43,13 @@ export async function getTenantDailySpendStroops(
   });
   return Number(result._sum.feeStroops ?? 0);
 }
+
+export async function getTenantDailyTransactionCount(
+  tenantId: string,
+  now: Date = new Date()
+): Promise<number> {
+  const { start, end } = getUtcDayRange(now);
+  return prisma.sponsoredTransaction.count({
+    where: { tenantId, createdAt: { gte: start, lt: end } },
+  });
+}

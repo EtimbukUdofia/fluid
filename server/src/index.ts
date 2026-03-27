@@ -2,46 +2,43 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express, { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
-import { createLogger, serializeError } from "./utils/logger";
-import redisClient from "./utils/redis";
-import { RedisRateLimitStore } from "./utils/redisRateLimitStore";
-import cors from "cors";
-import dotenv from "dotenv";
 import { loadConfig } from "./config";
 import { AppError } from "./errors/AppError";
-import { feeBumpHandler, feeBumpBatchHandler } from "./handlers/feeBump";
-import {
-  getHorizonFailoverClient,
-  initializeHorizonFailoverClient,
-} from "./horizon/failoverClient";
-import { apiKeyMiddleware } from "./middleware/apiKeys";
 import {
   listApiKeysHandler,
   revokeApiKeyHandler,
   upsertApiKeyHandler,
 } from "./handlers/adminApiKeys";
-import { feeBumpHandler } from "./handlers/feeBump";
-import { getHorizonFailoverClient } from "./horizon/failoverClient";
-import { apiKeyMiddleware } from "./middleware/apiKeys";
+import {
+  listSubscriptionTiersHandler,
+  updateTenantSubscriptionTierHandler,
+} from "./handlers/adminSubscriptionTiers";
 import {
   addSignerHandler,
   listSignersHandler,
   removeSignerHandler,
 } from "./handlers/adminSigners";
-import { globalErrorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { feeBumpBatchHandler, feeBumpHandler } from "./handlers/feeBump";
 import { createCheckoutSessionHandler, stripeWebhookHandler } from "./handlers/stripe";
+import {
+  getHorizonFailoverClient,
+  initializeHorizonFailoverClient,
+} from "./horizon/failoverClient";
+import { apiKeyMiddleware } from "./middleware/apiKeys";
+import { globalErrorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiKeyRateLimit } from "./middleware/rateLimit";
+import { tenantTierTxLimit } from "./middleware/txLimit";
 import { AlertService } from "./services/alertService";
 import { hydratePersistedSigners, listAdminSigners } from "./services/signerRegistry";
+import { createLogger, serializeError } from "./utils/logger";
+import redisClient from "./utils/redis";
+import { RedisRateLimitStore } from "./utils/redisRateLimitStore";
 import { initializeBalanceMonitor } from "./workers/balanceMonitor";
 import {
   getLedgerMonitor,
   initializeLedgerMonitor,
 } from "./workers/ledgerMonitor";
 import { transactionStore } from "./workers/transactionStore";
-
-const logger = createLogger({ component: "server" });
-import { getHorizonFailoverClient } from "./horizon/failoverClient";
 
 dotenv.config();
 
@@ -161,6 +158,7 @@ app.post(
   "/fee-bump",
   apiKeyMiddleware,
   apiKeyRateLimit,
+  tenantTierTxLimit,
   limiter,
   (req: Request, res: Response, next: NextFunction) => {
     void feeBumpHandler(req, res, config, next);
@@ -171,6 +169,7 @@ app.post(
   "/fee-bump/batch",
   apiKeyMiddleware,
   apiKeyRateLimit,
+  tenantTierTxLimit,
   limiter,
   (req: Request, res: Response, next: NextFunction) => {
     feeBumpBatchHandler(req, res, next, config);
@@ -213,6 +212,8 @@ app.get("/admin/api-keys", listApiKeysHandler);
 app.post("/admin/api-keys", upsertApiKeyHandler);
 app.patch("/admin/api-keys/:key/revoke", revokeApiKeyHandler);
 app.delete("/admin/api-keys/:key", revokeApiKeyHandler);
+app.get("/admin/subscription-tiers", listSubscriptionTiersHandler);
+app.patch("/admin/tenants/:tenantId/subscription-tier", updateTenantSubscriptionTierHandler);
 app.get("/admin/signers", listSignersHandler(config));
 app.post("/admin/signers", addSignerHandler(config));
 app.delete("/admin/signers/:publicKey", removeSignerHandler(config));
