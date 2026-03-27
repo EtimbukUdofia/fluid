@@ -51,7 +51,8 @@
     "dotenv": "^16.3.1"
   },
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "vue": ">=3"
   },
   "devDependencies": {
     "@rolldown/binding-win32-x64-msvc": "^1.0.0-rc.12",
