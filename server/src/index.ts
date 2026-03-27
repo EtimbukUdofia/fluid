@@ -1,19 +1,28 @@
-import { createLogger, serializeError } from "./utils/logger";
+import cors from "cors";
+import dotenv from "dotenv";
 import express, { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
+import { createLogger, serializeError } from "./utils/logger";
 import redisClient from "./utils/redis";
 import { RedisRateLimitStore } from "./utils/redisRateLimitStore";
 import cors from "cors";
 import dotenv from "dotenv";
 import { loadConfig } from "./config";
 import { AppError } from "./errors/AppError";
-import { feeBumpHandler } from "./handlers/feeBump";
+import { feeBumpHandler, feeBumpBatchHandler } from "./handlers/feeBump";
+import {
+  getHorizonFailoverClient,
+  initializeHorizonFailoverClient,
+} from "./horizon/failoverClient";
 import { apiKeyMiddleware } from "./middleware/apiKeys";
 import {
   listApiKeysHandler,
   revokeApiKeyHandler,
   upsertApiKeyHandler,
 } from "./handlers/adminApiKeys";
+import { feeBumpHandler } from "./handlers/feeBump";
+import { getHorizonFailoverClient } from "./horizon/failoverClient";
+import { apiKeyMiddleware } from "./middleware/apiKeys";
 import {
   addSignerHandler,
   listSignersHandler,
@@ -29,6 +38,8 @@ import {
   initializeLedgerMonitor,
 } from "./workers/ledgerMonitor";
 import { transactionStore } from "./workers/transactionStore";
+
+const logger = createLogger({ component: "server" });
 import { getHorizonFailoverClient } from "./horizon/failoverClient";
 
 dotenv.config();
@@ -155,6 +166,16 @@ app.post(
   },
 );
 
+app.post(
+  "/fee-bump/batch",
+  apiKeyMiddleware,
+  apiKeyRateLimit,
+  limiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    feeBumpBatchHandler(req, res, next, config);
+  },
+);
+
 app.post("/test/add-transaction", (req: Request, res: Response) => {
   const { hash, status = "pending", tenantId = "test-tenant" } = req.body;
 
@@ -254,4 +275,66 @@ async function bootstrap(): Promise<void> {
   });
 }
 
+  if (config.horizonUrls.length > 0) {
+    try {
+      const ledgerMonitor = initializeLedgerMonitor(config);
+      ledgerMonitor.start();
+      logger.info("Ledger monitor worker started");
+    } catch (error) {
+      logger.error({ ...serializeError(error) }, "Failed to start ledger monitor");
+    }
+  } else {
+    logger.info("No Horizon URLs configured; ledger monitor disabled");
+  }
+
+  if (
+    config.horizonUrl &&
+    config.alerting.lowBalanceThresholdXlm !== undefined &&
+    alertService.isEnabled()
+  ) {
+    try {
+      const balanceMonitor = initializeBalanceMonitor(config, alertService);
+      balanceMonitor.start();
+      logger.info("Balance monitor worker started");
+    } catch (error) {
+      logger.error({ ...serializeError(error) }, "Failed to start balance monitor");
+    }
+  } else {
+    logger.info(
+      "Low balance alerting disabled - missing Horizon URL, threshold, or alert transport",
+    );
+  }
+
+  app.listen(PORT, () => {
+    logger.info(
+      {
+        fee_payers_loaded: config.feePayerAccounts.length,
+        fee_payer_public_keys: config.feePayerAccounts.map((account) => account.publicKey),
+        horizon_node_count: config.horizonUrls.length,
+        horizon_nodes: config.horizonUrls,
+        horizon_selection_strategy: config.horizonSelectionStrategy,
+        port: PORT,
+        url: `http://0.0.0.0:${PORT}`,
+      },
+      "Fluid server started",
+    );
+  });
+}
+
+app.listen(PORT, () => {
+  logger.info(
+    {
+      fee_payers_loaded: config.feePayerAccounts.length,
+      fee_payer_public_keys: config.feePayerAccounts.map(
+        (account) => account.publicKey,
+      ),
+      horizon_node_count: config.horizonUrls.length,
+      horizon_nodes: config.horizonUrls,
+      horizon_selection_strategy: config.horizonSelectionStrategy,
+      port: PORT,
+      url: `http://0.0.0.0:${PORT}`,
+    },
+    "Fluid server started",
+  );
+});
 void bootstrap();

@@ -36,6 +36,14 @@ export interface TransactionHistoryRow {
   tenant: string;
 }
 
+export interface TenantUsageRow {
+  tenant: string;
+  txCount: number;
+  totalCostStroops: number;
+  successCount: number;
+  failedCount: number;
+}
+
 export interface ApiKey {
   id: string;
   key: string;
