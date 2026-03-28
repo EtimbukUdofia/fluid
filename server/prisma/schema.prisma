@@ -9,35 +9,58 @@ datasource db {
   provider = "sqlite"
 }
 
+model SubscriptionTier {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  txLimit      Int
+  rateLimit    Int
+  priceMonthly Int
+  tenants      Tenant[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Tenant {
   id                 String            @id @default(uuid())
   name               String
+  subscriptionTierId String
+  subscriptionTier   SubscriptionTier  @relation(fields: [subscriptionTierId], references: [id])
   dailyQuotaStroops  BigInt            @default(1000000) // 0.1 XLM default
   totalCredit        BigInt            @default(0) // Total purchased credit
   webhookUrl         String?
   webhookSecret      String?
   webhookEventTypes  String?
-  apiKeys            ApiKey[]
-  webhookDeliveries  WebhookDelivery[]
-  quotaTopUps QuotaTopUp[]
-  payments           Payment[]
+  apiKeys                ApiKey[]
+  webhookDeliveries      WebhookDelivery[]
+  webhookDlqEntries      WebhookDlq[]
+  quotaTopUps            QuotaTopUp[]
+  payments               Payment[]
+  sponsoredTransactions  SponsoredTransaction[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
+
+  @@index([subscriptionTierId])
 }
 
 model ApiKey {
-  id                String   @id @default(uuid())
-  key               String   @unique
-  prefix            String
-  tenantId          String
-  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  active            Boolean  @default(true)
-  dailyQuotaStroops BigInt   @default(1000000) // 0.1 XLM default
-  maxRequests       Int      @default(5)
-  windowMs          Int      @default(60000)
-  tier              String   @default("free") // free or pro
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                    String    @id @default(uuid())
+  key                   String    @unique
+  prefix                String
+  name                  String    @default("Default API Key")
+  tenantId              String
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  active                Boolean   @default(true)
+  dailyQuotaStroops     BigInt    @default(1000000) // 0.1 XLM default
+  maxRequests           Int       @default(5)
+  windowMs              Int       @default(60000)
+  tier                  String    @default("free") // free or pro
+  isSandbox             Boolean   @default(false)
+  sandboxFeePayerSecret String?
+  sandboxLastResetAt    DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([isSandbox])
 }
 
 model WebhookDelivery {
@@ -57,6 +80,23 @@ model WebhookDelivery {
   @@index([tenantId])
 }
 
+model WebhookDlq {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  deliveryId     String
+  url            String
+  payload        String
+  lastError      String?
+  retryCount     Int
+  failedAt       DateTime @default(now())
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([expiresAt])
+}
+
 model QuotaTopUp {
   id              String   @id @default(uuid())
   tenantId        String
@@ -65,6 +105,23 @@ model QuotaTopUp {
   amountCents     Int
   quotaStroops    BigInt
   status          String   @default("pending") // pending, fulfilled, failed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  stripeSessionId String   @unique
+  stripePaymentId String?
+  amountCents     Int
+  creditStroops   BigInt
+  status          String   @default("pending")
+  metadata        Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -98,4 +155,60 @@ model SignerSecret {
   authTag           String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([token])
+}
+
+// Holds unverified sign-up requests until the developer confirms their email.
+model PendingRegistration {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  projectName   String
+  intendedUse   String
+  token         String   @unique
+  tokenExpiresAt DateTime
+  // pending → verified (token consumed) or expired (TTL elapsed)
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([token])
+  @@index([status])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  txHash      String?  // The hash of the fee-bump transaction
+  innerTxHash String   // The hash of the original transaction
+  tenantId    String
+  status      String   // PENDING, SUCCESS, FAILED
+  costStroops BigInt
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([txHash])
+}
+
+// In-dashboard notification centre — persisted alerts for logged-in admins.
+model AdminNotification {
+  id        String   @id @default(uuid())
+  type      String   // "low_balance" | "incident" | "info" | "warning" | "critical"
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  String?  // JSON blob for extra context (e.g. publicKey, balanceXlm)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([read])
+  @@index([createdAt])
 }

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ─── Fluid Design System — CSS Variable Tokens ─────────────────────────────
  *
@@ -130,23 +131,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #000000;
-}
-
-.dark {
-  --background: #020617;
-  --foreground: #ffffff;
-}
+/* ─── Base styles ─────────────────────────────────────────────────────────── */
 
 @layer base {
-
   *,
   ::after,
   ::before,
   ::placeholder {
-    border-color: var(--color-gray-200);
+    border-color: hsl(var(--border));
   }
 
   html {
@@ -155,12 +147,6 @@
 
   html.dark {
     color-scheme: dark;
-  }
-/* ─── Base styles ─────────────────────────────────────────────────────────── */
-
-@layer base {
-  * {
-    border-color: hsl(var(--border));
   }
 
   body {

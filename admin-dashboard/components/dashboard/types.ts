@@ -54,6 +54,31 @@ export interface ApiKey {
   updatedAt: string;
 }
 
+export type SubscriptionTierCode = "free" | "pro" | "enterprise";
+
+export interface SubscriptionTier {
+  id: string;
+  name: "Free" | "Pro" | "Enterprise";
+  code: SubscriptionTierCode;
+  txLimit: number;
+  rateLimit: number;
+  priceMonthly: number;
+}
+
+export interface TenantTierSummary {
+  id: string;
+  name: string;
+  subscriptionTierId: string;
+  subscriptionTier: SubscriptionTier;
+}
+
+export interface SubscriptionTierPageData {
+  tiers: SubscriptionTier[];
+  tenants: TenantTierSummary[];
+  tenant: TenantTierSummary | null;
+  source: "live" | "sample";
+}
+
 export type WebhookEventType = "tx.success" | "tx.failed" | "balance.low";
 
 export interface WebhookTenantSettings {
@@ -62,6 +87,19 @@ export interface WebhookTenantSettings {
   webhookUrl: string | null;
   eventTypes: WebhookEventType[];
   updatedAt: string | null;
+}
+
+export interface WebhookDlqItem {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  deliveryId: string;
+  url: string;
+  payload: string;
+  lastError: string | null;
+  retryCount: number;
+  failedAt: string;
+  expiresAt: string;
 }
 
 export type TransactionHistorySort =
@@ -88,53 +126,21 @@ export interface TransactionHistoryPageData {
   source: "live" | "sample";
 }
 
-export type WebhookDeliveryStatus = "success" | "failed" | "pending" | "retrying";
+export type PartnerStatus = "pending" | "approved" | "rejected";
 
-export interface WebhookDeliveryLog {
+export interface Partner {
   id: string;
-  tenantId: string;
-  tenantName: string | null;
-  eventType: WebhookEventType;
-  webhookUrl: string;
-  status: WebhookDeliveryStatus;
-  attempts: number;
-  maxAttempts: number;
-  responseCode: number | null;
-  responseMessage: string | null;
-  payload: any;
-  createdAt: string;
-  updatedAt: string;
-  nextRetryAt: string | null;
+  projectName: string;
+  contactEmail: string;
+  websiteUrl: string;
+  description: string;
+  status: PartnerStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewNote: string | null;
 }
 
-export type WebhookDeliverySort =
-  | "time_desc"
-  | "time_asc"
-  | "status_asc"
-  | "status_desc"
-  | "attempts_desc"
-  | "attempts_asc";
-
-export interface WebhookDeliveryQuery {
-  page: number;
-  pageSize: number;
-  search: string;
-  sort: WebhookDeliverySort;
-  statusFilter: WebhookDeliveryStatus[];
-  eventTypeFilter: WebhookEventType[];
-  tenantFilter: string[];
-}
-
-export interface WebhookDeliveryPageData {
-  rows: WebhookDeliveryLog[];
-  page: number;
-  pageSize: number;
-  totalRows: number;
-  totalPages: number;
-  sort: WebhookDeliverySort;
-  search: string;
-  statusFilter: WebhookDeliveryStatus[];
-  eventTypeFilter: WebhookEventType[];
-  tenantFilter: string[];
+export interface PartnerPageData {
+  partners: Partner[];
   source: "live" | "sample";
 }
