@@ -36,6 +36,12 @@ export function Navbar() {
                         Plugins
                     </Link>
                     <Link
+                        href="/forum"
+                        className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-block"
+                    >
+                        Forum
+                    </Link>
+                    <Link
                         href="/sdk"
                         className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-block"
                     >
