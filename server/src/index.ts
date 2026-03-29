@@ -105,6 +105,8 @@ import { listTransactionsHandler } from "./handlers/adminTransactions";
 import { getSpendForecastHandler } from "./handlers/adminAnalytics";
 import { getFeeMultiplierHandler } from "./handlers/adminFeeMultiplier";
 import { estimateFeeHandler } from "./handlers/estimate";
+import { exportAuditLogHandler } from "./handlers/adminAuditLog";
+import { ensureAuditLogTableIntegrity } from "./services/auditLogger";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger";
 import { initializeTreasuryRefill } from "./workers/treasuryRefill";
@@ -115,6 +117,20 @@ import { TreasuryRebalancer } from "./services/treasuryRebalancer";
 dotenv.config();
 const logger = createLogger({ component: "server" });
 const config = loadConfig();
+
+async function initializeAuditLog() {
+  try {
+    await ensureAuditLogTableIntegrity();
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : error },
+      "Failed to initialize audit log integrity",
+    );
+  }
+}
+
+initializeAuditLog();
+
 const feeManager = initializeFeeManager(config);
 const slackNotifier = new SlackNotifier(loadSlackNotifierOptionsFromEnv());
 const pagerDutyNotifier = new PagerDutyNotifier();
@@ -372,6 +388,7 @@ app.delete("/admin/device-tokens/:id", deleteDeviceTokenHandler);
 app.get("/admin/webhooks/dlq", listDlqHandler);
 app.post("/admin/webhooks/dlq/replay", replayDlqHandler);
 app.post("/admin/webhooks/dlq/delete", deleteDlqHandler);
+app.get("/admin/audit-log/export", exportAuditLogHandler);
 
 // Notification centre routes (SSE must be registered before /:id/read)
 app.get("/admin/notifications/sse", (req: Request, res: Response) =>
